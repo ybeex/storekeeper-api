@@ -1,0 +1,67 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions: { contents: read }
+concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: storekeeper, POSTGRES_PASSWORD: storekeeper, POSTGRES_DB: storekeeper }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U storekeeper" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://storekeeper:storekeeper@localhost:5432/storekeeper
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+      JOBS_MODE: inline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Generate and apply migrations
+        run: |
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          npm run db:generate
+          npm run db:setup
+      - name: Integration tests
+        run: npm test
+      # Last on purpose, so the tests above still run on the very first CI run (before migrations are committed).
+      - name: Migrations are committed and in sync with the schema
+        run: git diff --exit-code -- drizzle/ || (echo "::error::drizzle/ is out of date or uncommitted: run 'npm run db:generate' and commit the result" && exit 1)
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Dependency audit (production deps, high+)
+        run: npm audit --omit=dev --audit-level=high
+
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t storekeeper-api:ci .
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.24.0
+        with: { image-ref: storekeeper-api:ci, severity: 'CRITICAL,HIGH', exit-code: '1', ignore-unfixed: true }

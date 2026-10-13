@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: storekeeper
+      POSTGRES_PASSWORD: storekeeper
+      POSTGRES_DB: storekeeper
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U storekeeper"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # PgBouncer in transaction-pooling mode, fronting Postgres — this is
+  # what the app talks to in a real deployment (see
+  # references/performance-and-scale.md for why). Included here so the
+  # local setup matches production topology; point DATABASE_URL at
+  # :6432 instead of :5432 to exercise it locally.
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DATABASE_URL: postgres://storekeeper:storekeeper@db:5432/storekeeper
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 2000
+      DEFAULT_POOL_SIZE: 25
+    ports: ["6432:6432"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  # S3-compatible object storage for item photos / transaction snapshots (private bucket).
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment: { MINIO_ROOT_USER: minioadmin, MINIO_ROOT_PASSWORD: minioadmin }
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["miniodata:/data"]
+  minio-init:
+    image: minio/mc:latest
+    depends_on: [minio]
+    entrypoint: >
+      /bin/sh -c "sleep 3; mc alias set l http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing l/storekeeper-files; mc anonymous set none l/storekeeper-files; exit 0"
+
+  # Catches outbound email locally (SMTP :1025, UI :8025). Use MAIL_HOST=localhost MAIL_PORT=1025 MAIL_ENABLED=true.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
+
+volumes:
+  pgdata:
+  miniodata:
