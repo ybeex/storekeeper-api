@@ -1,0 +1,56 @@
+{
+  "name": "storekeeper-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "node --import tsx --import ./test/env-setup.ts --test --test-concurrency=1 test/*.test.ts",
+    "lint": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "start:worker": "node dist/worker.js",
+    "dev:worker": "tsx watch src/worker.ts",
+    "test:unit": "node --import tsx --import ./test/env-setup.ts --test test/unit/*.test.ts",
+    "db:setup": "psql \"$DATABASE_URL\" -f drizzle/manual/0000_enable_extensions.sql && drizzle-kit migrate && psql \"$DATABASE_URL\" -f drizzle/manual/0001_role_settings.sql && psql \"$DATABASE_URL\" -f drizzle/manual/0002_ledger_immutability.sql && psql \"$DATABASE_URL\" -f drizzle/manual/0003_catalog_appearance_and_imports.sql",
+    "seed": "node --import tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.680.0",
+    "@aws-sdk/s3-request-presigner": "^3.680.0",
+    "@fastify/cors": "^10.0.1",
+    "@fastify/helmet": "^12.0.1",
+    "@fastify/multipart": "^9.0.1",
+    "@fastify/rate-limit": "^10.1.1",
+    "@fastify/swagger": "^9.2.0",
+    "@fastify/swagger-ui": "^5.1.0",
+    "@fastify/type-provider-typebox": "^5.0.1",
+    "@fastify/under-pressure": "^9.0.1",
+    "@sinclair/typebox": "^0.33.12",
+    "argon2": "^0.41.1",
+    "bullmq": "^5.25.0",
+    "csv-parse": "^5.5.6",
+    "drizzle-orm": "^0.36.1",
+    "fastify": "^5.1.0",
+    "fastify-plugin": "^5.0.1",
+    "ioredis": "^5.4.1",
+    "nodemailer": "^6.9.16",
+    "postgres": "^3.4.5",
+    "prom-client": "^15.1.3",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "drizzle-kit": "^0.28.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/nodemailer": "^6.4.17",
+    "@types/qrcode": "^1.5.5"
+  }
+}
