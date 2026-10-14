@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /**
  * Offline sync (PRD §21, §56.5). A device queues actions while offline and
  * replays them here. The SERVER is the source of truth:
@@ -128,7 +129,7 @@ async function resolveConflict(db: Db, reviewer: Principal, id: string, resoluti
   });
 }
 
-export async function syncRoutes(app: FastifyInstance) {
+export async function syncRoutes(app: ApiFastifyInstance) {
   /**
    * Reference data for the device's offline cache (PRD §21: "caching recently used inventory and holder information").
    * First call (no `since`): everything. Later calls pass the previous `serverTime` and get only what changed.

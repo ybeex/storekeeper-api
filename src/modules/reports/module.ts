@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /**
  * Reports (PRD §40) with CSV export. `format=csv` streams: the transactions report
  * pages through the ledger by `seq` in batches so a year of history never has to fit in memory.
@@ -30,7 +31,7 @@ function sendCsv(reply: FastifyReply, filename: string, header: string[], rows: 
 const Range = { from: Type.Optional(Type.String({ format: 'date-time' })), to: Type.Optional(Type.String({ format: 'date-time' })), locationId: Type.Optional(Uuid), format: Type.Optional(Type.Union([Type.Literal('json'), Type.Literal('csv')])) };
 const MAX_JSON_ROWS = 5000;
 
-export async function reportRoutes(app: FastifyInstance) {
+export async function reportRoutes(app: ApiFastifyInstance) {
   const READ = requireRole('admin', 'supervisor', 'viewer');
 
   app.get('/inventory', { preHandler: [app.authenticate, READ], schema: { querystring: Type.Object({ locationId: Range.locationId, format: Range.format, categoryId: Type.Optional(Uuid) }) } }, async (req, reply) => {

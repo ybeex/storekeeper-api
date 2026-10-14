@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** Teams and departments (Holders, PRD §8) plus membership. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -14,7 +15,7 @@ const Members = Type.Object({ personIds: Type.Array(Uuid, { minItems: 1, maxItem
 const ser = (t: typeof teams.$inferSelect) => ({ id: t.id, name: t.name, kind: t.kind, archivedAt: iso(t.archivedAt), createdAt: t.createdAt.toISOString() });
 const MANAGE = requireRole('admin', 'supervisor');
 
-export async function teamRoutes(app: FastifyInstance) {
+export async function teamRoutes(app: ApiFastifyInstance) {
   app.post('/', { config: { idempotent: true }, preHandler: [app.authenticate, MANAGE], schema: { body: Create } }, async (req, reply) => {
     const a = req.user!;
     const [t] = await req.server.db.insert(teams).values({ orgId: a.orgId, ...req.body }).returning();

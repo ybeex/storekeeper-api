@@ -1,8 +1,9 @@
+import type { ApiFastifyInstance } from '../../types.js';
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { authRouteRateLimit } from '../../plugins/security.js';
 import { sessionCacheKey } from '../../plugins/auth.js';
-import { anyRole } from '../../plugins/rbac.js';
+import { anyRole, requireRole } from '../../plugins/rbac.js';
 import { hashToken } from '../../lib/tokens.js';
 import { env } from '../../env.js';
 import { users, organizations, locations, sessions, people } from '../../db/schema.js';
@@ -13,6 +14,7 @@ import {
 } from './schema.js';
 import {
   issueSession, registerOrganization, login, logout, changePassword, requestPasswordReset, resetPassword, acceptInvite,
+  switchOrganization,
 } from './service.js';
 
 const SessionResponse = Type.Object({
@@ -24,11 +26,11 @@ function bearer(req: { headers: Record<string, unknown> }): string | undefined {
   return typeof h === 'string' ? h.replace(/^Bearer\s+/i, '') : undefined;
 }
 
-export async function authRoutes(app: FastifyInstance) {
+export async function authRoutes(app: ApiFastifyInstance) {
   const evict = async (hashes: string[]) => {
     if (hashes.length === 0) return;
     // Best effort: the cache TTL bounds staleness even if Redis is unreachable right now.
-    await app.redis.del(...hashes.map(sessionCacheKey)).catch((err) => app.log.warn({ err }, 'session cache evict failed'));
+    await app.redis.del(...hashes.map(sessionCacheKey)).catch((err: unknown) => app.log.warn({ err }, 'session cache evict failed'));
   };
   const info = (req: { ip: string; headers: Record<string, unknown> }) => ({ ip: req.ip, userAgent: String(req.headers['user-agent'] ?? '') });
 
@@ -44,6 +46,15 @@ export async function authRoutes(app: FastifyInstance) {
     const r = await login(req.server.db, req.body, info(req));
     await evict(r.session.evictedTokenHashes);
     return { token: r.session.token, expiresAt: r.session.expiresAt.toISOString(), userId: r.userId, orgId: r.orgId, role: r.role };
+  });
+
+  // An admin who runs several organisations moves between them. Lives under /auth so the web proxy turns the returned token into the session cookie.
+  app.post('/switch-org', { preHandler: [app.authenticate, requireRole('admin')], schema: { body: Type.Object({ orgId: Type.String({ format: 'uuid' }) }, { additionalProperties: false }), response: { 200: SessionResponse } } }, async (req) => {
+    const r = await switchOrganization(req.server.db, req.user!.id, req.body.orgId, info(req));
+    const old = bearer(req); // the browser is about to forget the old token, so end that session instead of leaving it live
+    if (old && r.user.id !== req.user!.id) { await logout(req.server.db, old); await evict([hashToken(old)]); }
+    await evict(r.session.evictedTokenHashes);
+    return { token: r.session.token, expiresAt: r.session.expiresAt.toISOString(), userId: r.user.id, orgId: r.user.orgId, role: r.user.role };
   });
 
   app.post('/logout', { preHandler: [app.authenticate, anyRole], schema: { response: { 204: { type: 'null' } } } }, async (req, reply) => {

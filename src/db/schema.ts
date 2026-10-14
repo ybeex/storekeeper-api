@@ -117,9 +117,16 @@ export const users = pgTable('users', {
   failedLoginCount: integer('failed_login_count').notNull().default(0),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
   passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }).notNull().defaultNow(),
+  // Links the admin rows of ONE person who runs several organisations. Only ever set when an authenticated admin creates
+  // another organisation, never from an email match (email is not verified, so matching on it would let anyone claim an
+  // admin's other organisations). Invited users never get one: they work in exactly one organisation.
+  accountId: uuid('account_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({ orgEmailUnique: uniqueIndex('users_org_email_unique').on(t.orgId, t.email) }));
+}, (t) => ({
+  orgEmailUnique: uniqueIndex('users_org_email_unique').on(t.orgId, t.email),
+  byAccount: uniqueIndex('users_account_org_unique').on(t.accountId, t.orgId).where(sql`account_id is not null`), // one row per organisation per account
+}));
 
 // Location-scoped permissions (PRD Phase 2). A user with NO rows may act at every
 // location; a user with rows is confined to exactly those.

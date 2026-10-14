@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /**
  * Stock reconciliation (PRD §19, §56.4).
  *
@@ -174,7 +175,7 @@ export async function runScheduleScan(db: Db): Promise<number> {
   return opened;
 }
 
-export async function reconciliationRoutes(app: FastifyInstance) {
+export async function reconciliationRoutes(app: ApiFastifyInstance) {
   const SUP = requireRole('admin', 'supervisor');
   const COUNTERS = requireRole('admin', 'supervisor', 'store_staff');
 

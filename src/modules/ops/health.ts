@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 import type { FastifyInstance } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
 import { sql } from 'drizzle-orm';
@@ -8,7 +9,7 @@ import { breakerStates } from '../../lib/circuit-breaker.js';
 const safeEq = (a: string, b: string) => { const x = Buffer.from(a); const y = Buffer.from(b); return x.length === y.length && timingSafeEqual(x, y); };
 const withTimeout = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 
-export async function healthRoutes(app: FastifyInstance) {
+export async function healthRoutes(app: ApiFastifyInstance) {
   // Liveness: the process is up. Never touches dependencies (a DB blip must not make the orchestrator kill healthy pods).
   app.get('/healthz', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
 

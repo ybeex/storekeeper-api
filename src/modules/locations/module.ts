@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** Locations (PRD §9). One active location per org at launch is an entitlement (org_settings.location_limit). */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -56,7 +57,7 @@ async function archive(db: Db, actor: Principal, id: string) {
   });
 }
 
-export async function locationRoutes(app: FastifyInstance) {
+export async function locationRoutes(app: ApiFastifyInstance) {
   app.get('/', { preHandler: [app.authenticate, anyRole] }, async (req) => {
     const allowed = await allowedLocationIds(req.server.db, req.user!);
     const rows = await req.server.db.select().from(locations).where(and(eq(locations.orgId, req.user!.orgId), isNull(locations.archivedAt))).orderBy(asc(locations.createdAt));

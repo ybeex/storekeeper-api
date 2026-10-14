@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** File uploads (PRD §23, §52): item photos and transaction snapshots. Validated by content, not by filename or declared type. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -21,7 +22,7 @@ export function sniffImage(b: Buffer): Sniffed | null {
   return null;
 }
 
-export async function fileRoutes(app: FastifyInstance) {
+export async function fileRoutes(app: ApiFastifyInstance) {
   // multipart/form-data: field `kind` (item_photo | transaction_snapshot) must precede the `file` part.
   app.post('/', { preHandler: [app.authenticate, requireRole('admin', 'supervisor', 'store_staff')] }, async (req, reply) => {
     const part = await req.file({ limits: { fileSize: env.MAX_IMAGE_BYTES, files: 1 } });

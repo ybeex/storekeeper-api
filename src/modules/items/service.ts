@@ -88,7 +88,7 @@ export async function listItems(db: Db, user: Principal, q: ListItemsQuery) {
     needle ? or(ilike(items.name, needle), ilike(items.sku, needle), ilike(items.assetTag, needle)) : undefined,
     q.cursor ? keysetWhere(items.createdAt, items.id, q.cursor) : undefined,
   ];
-  const rows = await baseSelect(db, allowed).where(and(...conds)).orderBy(desc(items.createdAt), desc(items.id)).limit(limit + 1);
+  const rows = await baseSelect(db, allowed).where(and(...conds.filter((condition): condition is SQL => condition !== undefined))).orderBy(desc(items.createdAt), desc(items.id)).limit(limit + 1);
   const page = toPage(rows.map((r) => ({ ...r, createdAt: r.item.createdAt, id: r.item.id })), limit);
   return { items: await Promise.all(page.items.map(view)), nextCursor: page.nextCursor };
 }

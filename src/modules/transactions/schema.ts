@@ -32,7 +32,10 @@ export const RestockBody = Type.Object({ itemId: Uuid, quantity: Qty, locationId
 
 export const AdjustmentBody = Type.Object({
   itemId: Uuid, delta: Type.Integer({ minimum: -100_000_000, maximum: 100_000_000 }),
-  reason: Type.Union(['count_correction', 'opening_balance', 'unrecorded_movement', 'damage', 'loss', 'other'].map((r) => Type.Literal(r)) as never),
+  reason: Type.Union([
+    Type.Literal('count_correction'), Type.Literal('opening_balance'), Type.Literal('unrecorded_movement'),
+    Type.Literal('damage'), Type.Literal('loss'), Type.Literal('other'),
+  ]),
   locationId: Type.Optional(Uuid), ...Common,
 }, Strict);
 

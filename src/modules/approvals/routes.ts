@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { and, desc, eq } from 'drizzle-orm';
@@ -18,7 +19,7 @@ const ser = (r: typeof approvalRequests.$inferSelect, requesterEmail?: string) =
   failureReason: r.failureReason, createdAt: r.createdAt.toISOString(),
 });
 
-export async function approvalRoutes(app: FastifyInstance) {
+export async function approvalRoutes(app: ApiFastifyInstance) {
   app.get('/', { preHandler: [app.authenticate, anyRole], schema: { querystring: ListQuery } }, async (req) => {
     const a = req.user!; const q = req.query; const limit = q.limit ?? 25;
     const privileged = a.role === 'admin' || a.role === 'supervisor';

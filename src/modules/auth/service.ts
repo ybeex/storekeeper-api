@@ -1,4 +1,4 @@
-import { and, eq, desc, gt, isNull, sql, notInArray } from 'drizzle-orm';
+import { and, eq, desc, gt, inArray, isNull, sql, notInArray } from 'drizzle-orm';
 import type { Db } from '../../db/index.js';
 import {
   organizations, orgSettings, locations, users, sessions, userTokens, approvalPolicies, people, userLocations,
@@ -6,12 +6,13 @@ import {
 import { env } from '../../env.js';
 import { hashPassword, verifyPassword, passwordProblems } from '../../lib/password.js';
 import { newSessionToken, hashToken } from '../../lib/tokens.js';
-import { AppError, ConflictError, UnauthorizedError, ValidationError } from '../../lib/errors.js';
+import { AppError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '../../lib/errors.js';
+import { assertNotInAnotherOrg } from '../../lib/single-org.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { audit } from '../../lib/audit.js';
 import { queueEmail } from '../../lib/notify.js';
 import { authFailures } from '../../lib/metrics.js';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 // Verified against when the account doesn't exist, so "no such user" and "wrong password"
 // cost the same CPU time and can't be told apart by response latency.
@@ -125,8 +126,10 @@ export async function changePassword(db: Db, userId: string, current: string, ne
   if (problems.length) throw new ValidationError(`Password ${problems.join(', ')}`);
   const hash = await hashPassword(next);
   return db.transaction(async (tx) => {
-    await tx.update(users).set({ passwordHash: hash, passwordChangedAt: new Date(), updatedAt: new Date() }).where(eq(users.id, userId));
-    const old = await tx.delete(sessions).where(eq(sessions.userId, userId)).returning({ h: sessions.tokenHash });
+    // An admin who runs several organisations has one password for all of them: change it everywhere, sign out everywhere.
+    const group = await accountGroup(tx, u);
+    await tx.update(users).set({ passwordHash: hash, passwordChangedAt: new Date(), updatedAt: new Date() }).where(inArray(users.id, group));
+    const old = await tx.delete(sessions).where(inArray(sessions.userId, group)).returning({ h: sessions.tokenHash });
     const session = await issueSession(tx, userId);
     await audit(tx, { orgId: u.orgId, actorUserId: userId, action: 'auth.password_changed', entityType: 'user', entityId: userId });
     return { session, revokedHashes: old.map((o) => o.h) };
@@ -171,8 +174,10 @@ export async function resetPassword(db: Db, token: string, password: string): Pr
     const problems = passwordProblems(password, t.email);
     if (problems.length) throw new ValidationError(`Password ${problems.join(', ')}`);
     const hash = await hashPassword(password);
-    await tx.update(users).set({ passwordHash: hash, passwordChangedAt: new Date(), failedLoginCount: 0, lockedUntil: null, updatedAt: new Date() }).where(eq(users.id, t.userId!));
-    const old = await tx.delete(sessions).where(eq(sessions.userId, t.userId!)).returning({ h: sessions.tokenHash });
+    const [target] = await tx.select().from(users).where(eq(users.id, t.userId!)).limit(1);
+    const group = target ? await accountGroup(tx, target) : [t.userId!];
+    await tx.update(users).set({ passwordHash: hash, passwordChangedAt: new Date(), failedLoginCount: 0, lockedUntil: null, updatedAt: new Date() }).where(inArray(users.id, group));
+    const old = await tx.delete(sessions).where(inArray(sessions.userId, group)).returning({ h: sessions.tokenHash });
     await audit(tx, { orgId: t.orgId, actorUserId: t.userId, action: 'auth.password_reset', entityType: 'user', entityId: t.userId! });
     return old.map((o) => o.h);
   });
@@ -184,6 +189,7 @@ export async function acceptInvite(db: Db, token: string, password: string, info
     const t = await consumeToken(tx, token, 'invite');
     const problems = passwordProblems(password, t.email);
     if (problems.length) throw new ValidationError(`Password ${problems.join(', ')}`);
+    await assertNotInAnotherOrg(tx, t.orgId, t.email); // they may have joined elsewhere since the invite was sent
     let user;
     try {
       [user] = await tx.insert(users).values({ orgId: t.orgId, email: t.email, fullName: t.fullName, passwordHash: hash, role: t.role ?? 'store_staff' }).returning();
@@ -197,5 +203,71 @@ export async function acceptInvite(db: Db, token: string, password: string, info
     const session = await issueSession(tx, user.id, info);
     await audit(tx, { orgId: t.orgId, actorUserId: user.id, action: 'user.invite_accepted', entityType: 'user', entityId: user.id, next: { role: user.role } });
     return { user, session };
+  });
+}
+
+
+/** Every user row that shares this person's login: just themselves unless they run several organisations. */
+async function accountGroup(tx: Db, u: { id: string; accountId: string | null }): Promise<string[]> {
+  if (!u.accountId) return [u.id];
+  const rows = await tx.select({ id: users.id }).from(users).where(eq(users.accountId, u.accountId));
+  return rows.map((r) => r.id);
+}
+
+const MAX_ORGS_PER_ACCOUNT = 20;
+
+/**
+ * An admin starts another organisation under the same login. It gets its own users row (admin, same email and password
+ * hash) so every foreign key that points at users keeps meaning "this person, in this organisation", and the two rows
+ * are tied together by account_id. Only an authenticated admin can do this; nothing links rows by email.
+ */
+export async function createOrganizationForAdmin(db: Db, actorUserId: string, input: { organizationName: string; firstLocationName?: string }) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const slug = attempt === 0 ? slugify(input.organizationName) : `${slugify(input.organizationName)}-${randomBytes(2).toString('hex')}`;
+    try {
+      return await db.transaction(async (tx0) => {
+        const tx = tx0 as unknown as Db;
+        const [me] = await tx.select().from(users).where(eq(users.id, actorUserId)).for('update').limit(1); // serialises two quick creations
+        if (!me || !me.active || me.role !== 'admin') throw new ForbiddenError('Only an administrator can create an organisation');
+        const accountId = me.accountId ?? randomUUID();
+        if (me.accountId) {
+          const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(users).where(eq(users.accountId, me.accountId));
+          if (n >= MAX_ORGS_PER_ACCOUNT) throw new ValidationError(`An account can run up to ${MAX_ORGS_PER_ACCOUNT} organisations`);
+        } else {
+          await tx.update(users).set({ accountId }).where(eq(users.id, me.id));
+        }
+        const [org] = await tx.insert(organizations).values({ name: input.organizationName.trim(), slug }).returning();
+        if (!org) throw new Error('Organization insert returned no row');
+        await tx.insert(orgSettings).values({ orgId: org.id });
+        await tx.insert(approvalPolicies).values(DEFAULT_POLICIES.map((p) => ({ orgId: org.id, ...p })));
+        const [loc] = await tx.insert(locations).values({ orgId: org.id, name: input.firstLocationName?.trim() || 'Main Store', kind: 'store' }).returning();
+        if (!loc) throw new Error('Location insert returned no row');
+        const [user] = await tx.insert(users).values({ orgId: org.id, email: me.email, fullName: me.fullName, passwordHash: me.passwordHash, role: 'admin', accountId }).returning();
+        if (!user) throw new Error('Admin insert returned no row');
+        await tx.insert(people).values({ orgId: org.id, fullName: me.fullName?.trim() || me.email.split('@')[0], email: me.email, userId: user.id });
+        await audit(tx, { orgId: org.id, actorUserId: user.id, action: 'organization.created_by_admin', entityType: 'organization', entityId: org.id, next: { fromOrgId: me.orgId } });
+        return { org, user, location: loc };
+      });
+    } catch (err) {
+      if (isUniqueViolation(err, 'organizations_slug_unique')) continue;
+      throw err;
+    }
+  }
+  throw new ConflictError('SLUG_TAKEN', 'Could not allocate a unique organization identifier; try a different name');
+}
+
+/** Moves an admin into another of their organisations: a fresh session for that organisation's row. */
+export async function switchOrganization(db: Db, actorUserId: string, orgId: string, info: SessionInfo) {
+  return db.transaction(async (tx0) => {
+    const tx = tx0 as unknown as Db;
+    const [me] = await tx.select().from(users).where(eq(users.id, actorUserId)).limit(1);
+    if (!me || !me.active || me.role !== 'admin') throw new ForbiddenError('Only an administrator can switch organisations');
+    const [target] = me.accountId
+      ? await tx.select().from(users).where(and(eq(users.accountId, me.accountId), eq(users.orgId, orgId), eq(users.role, 'admin'), eq(users.active, true))).limit(1)
+      : [me.orgId === orgId ? me : undefined];
+    if (!target) throw new NotFoundError('Organization'); // someone else's organisation looks exactly like one that does not exist
+    const session = await issueSession(tx, target.id, info);
+    await audit(tx, { orgId: target.orgId, actorUserId: target.id, action: 'auth.org_switched', entityType: 'user', entityId: target.id, next: { fromOrgId: me.orgId } });
+    return { session, user: target, previousUserId: me.id };
   });
 }

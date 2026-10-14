@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** Operational views: dashboard, outstanding items, low stock (PRD §26, §27, §28; backlog OPS/DASH). */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -14,7 +15,7 @@ import { ValidationError } from '../../lib/errors.js';
 
 const holderName = sql<string | null>`coalesce(${people.fullName}, ${teams.name}, ${jobs.name})`;
 
-export async function viewRoutes(app: FastifyInstance) {
+export async function viewRoutes(app: ApiFastifyInstance) {
   app.get('/outstanding', { preHandler: [app.authenticate, anyRole], schema: { querystring: Type.Object({
     ...PageQuery, holderType: Type.Optional(Type.Union([Type.Literal('person'), Type.Literal('team'), Type.Literal('job')])), holderId: Type.Optional(Uuid),
     itemId: Type.Optional(Uuid), locationId: Type.Optional(Uuid), overdue: Type.Optional(Type.Boolean()), type: Type.Optional(Type.Union([Type.Literal('asset'), Type.Literal('consumable')])),

@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /**
  * CSV import (PRD §22): upload → map columns → validate → commit.
  *
@@ -278,7 +279,7 @@ const progressOf = (j: typeof importJobs.$inferSelect) => ({
   percent: j.totalRows ? Math.min(100, Math.floor((100 * (j.status === 'completed' ? j.totalRows : j.processedRows)) / j.totalRows)) : 0,
 });
 
-export async function importRoutes(app: FastifyInstance) {
+export async function importRoutes(app: ApiFastifyInstance) {
   const ADMIN = requireRole('admin');
 
   app.post('/', { preHandler: [app.authenticate, ADMIN] }, async (req, reply) => {

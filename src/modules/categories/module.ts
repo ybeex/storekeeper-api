@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** Categories: sit under exactly one shelf; every item sits under exactly one category. Created separately from shelves. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -29,7 +30,7 @@ async function activeShelf(tx: Db, orgId: string, shelfId: string) {
   return s;
 }
 
-export async function categoryRoutes(app: FastifyInstance) {
+export async function categoryRoutes(app: ApiFastifyInstance) {
   const ADMIN = requireRole('admin');
 
   app.post('/', { config: { idempotent: true }, preHandler: [app.authenticate, ADMIN], schema: { body: Create } }, async (req, reply) => {

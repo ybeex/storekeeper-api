@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** Audit log API — the readable side of "all actions monitored with logs". Append-only table; this is read-only. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -17,7 +18,7 @@ const Filters = {
 };
 const esc = (v: unknown) => { let s = v == null ? '' : v instanceof Date ? v.toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v); if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 
-export async function auditRoutes(app: FastifyInstance) {
+export async function auditRoutes(app: ApiFastifyInstance) {
   const pre = [app.authenticate, requireRole('admin', 'supervisor')];
   const like = (s: string) => `${s.replace(/[%_\\]/g, '\\$&')}%`;
   type F = { action?: string; entityType?: string; entityId?: string; actorUserId?: string; includeRequests?: boolean; from?: string; to?: string };

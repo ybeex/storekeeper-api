@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** In-app notifications (PRD §30). Visibility is by role; read state is per user. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -12,7 +13,7 @@ import { NotFoundError } from '../../lib/errors.js';
 import { keysetWhere, toPage } from '../../lib/pagination.js';
 import { IdParams, PageQuery } from '../../lib/schemas.js';
 
-export async function notificationRoutes(app: FastifyInstance) {
+export async function notificationRoutes(app: ApiFastifyInstance) {
   const visible = (orgId: string, role: string) => and(eq(notifications.orgId, orgId), sql`${role}::role = any(${notifications.audienceRoles})`);
 
   app.get('/', { preHandler: [app.authenticate, anyRole], schema: { querystring: Type.Object({ ...PageQuery, unread: Type.Optional(Type.Boolean()), type: Type.Optional(Type.String({ maxLength: 40 })) }) } }, async (req) => {

@@ -175,7 +175,7 @@ export async function doReplacement(tx: Db, ctx: OpContext, input: ReplacementIn
     ...baseRow(ctx, old, old.locationId), type: 'replacement', fromStatus: from, toStatus: 'retired', condition: 'replaced', note: input.note,
     snapshotFileId: input.snapshotFileId, idempotencyKey: input.idempotencyKey, metadata: meta(ctx, { replacementItemId: repl.id }),
   });
-  if (a.replayed) return a;
+  if (a.replayed) return { transaction: a.row, replayed: true };
   if (!(await casAssetStatus(tx, { orgId: actor.orgId, itemId: old.id, from: [from], to: 'retired', condition: 'replaced', actorUserId: actor.id }))) throw new ConflictError('STATE_CHANGED', 'The asset changed state; retry');
   await appendTransaction(tx, {
     ...baseRow(ctx, repl, repl.locationId), type: 'replacement', relatedTransactionId: a.row.id, note: `Replaces ${old.name}${old.assetTag ? ` (${old.assetTag})` : ''}: ${input.note}`, metadata: meta(ctx, { replaces: old.id }),
@@ -207,7 +207,7 @@ export async function doTransfer(tx: Db, ctx: OpContext, input: TransferInput): 
     ...baseRow(ctx, item, input.fromLocationId), type: 'transfer_out', counterpartLocationId: input.toLocationId, quantity: qty,
     stockDelta: isAsset ? null : -qty, note: input.note, snapshotFileId: input.snapshotFileId, idempotencyKey: input.idempotencyKey, metadata: meta(ctx),
   });
-  if (out.replayed) return out;
+  if (out.replayed) return { transaction: out.row, replayed: true };
   if (isAsset) {
     if (!(await casAssetStatus(tx, { orgId: actor.orgId, itemId: item.id, from: ['available'], to: 'available', locationId: input.toLocationId, actorUserId: actor.id }))) {
       throw new ConflictError('ITEM_NOT_AVAILABLE', 'The asset is no longer available to transfer');
@@ -254,7 +254,7 @@ export async function doCorrection(tx: Db, ctx: OpContext, input: CorrectionInpu
     if (isUniqueViolation(err, 'tx_corrects_unique')) throw new ConflictError('ALREADY_CORRECTED', 'This transaction has already been corrected');
     throw err;
   }
-  if (claimed.replayed) return claimed;
+  if (claimed.replayed) return { transaction: claimed.row, replayed: true };
   if (stockDelta && !(await stockApply(tx, { orgId: actor.orgId, itemId: item.id, locationId: target.locationId, delta: stockDelta }))) {
     throw new ConflictError('CORRECTION_BLOCKED', 'Stock has since been used; reversing this transaction would take it below zero');
   }

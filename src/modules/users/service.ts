@@ -5,6 +5,7 @@ import { env } from '../../env.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { keysetWhere, toPage } from '../../lib/pagination.js';
 import { audit } from '../../lib/audit.js';
+import { assertNotInAnotherOrg } from '../../lib/single-org.js';
 import { newSessionToken, hashToken } from '../../lib/tokens.js';
 import { queueEmail } from '../../lib/notify.js';
 import { allowedLocationIds, type Principal } from '../../lib/locations.js';
@@ -104,6 +105,7 @@ export async function createInvite(db: Db, actor: Principal, input: { email: str
     const tx = tx0 as unknown as Db;
     const [exists] = await tx.select({ id: users.id }).from(users).where(and(eq(users.orgId, actor.orgId), eq(users.email, email))).limit(1);
     if (exists) throw new ConflictError('EMAIL_TAKEN', 'A user with this email already exists');
+    await assertNotInAnotherOrg(tx, actor.orgId, email);
     if (input.personId) {
       const [p] = await tx.select({ id: people.id, u: people.userId }).from(people).where(and(eq(people.id, input.personId), eq(people.orgId, actor.orgId))).limit(1);
       if (!p) throw new NotFoundError('Person');
