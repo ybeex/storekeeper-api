@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /**
  * Write endpoints for every ledger operation + the ledger read API.
  *
@@ -69,7 +70,7 @@ async function gated<B extends Record<string, unknown>>(o: GateOpts<B>) {
   return { status: 'committed' as const, replayed: r.replayed, transaction: serializeTx(r.transaction), dueAt: r.dueAt?.toISOString() ?? null };
 }
 
-export async function transactionRoutes(app: FastifyInstance) {
+export async function transactionRoutes(app: ApiFastifyInstance) {
   app.post('/checkouts', { preHandler: [app.authenticate, MOVERS], schema: { body: S.CheckoutBody } }, (req, reply) =>
     gated({ req, reply, operation: 'checkout', metricType: 'checkout', magnitude: req.body.quantity ?? 1, itemId: req.body.itemId, body: req.body, run: doCheckout }));
 

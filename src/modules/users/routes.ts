@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from '../../plugins/rbac.js';
 import { invalidateAllSessionsForUser } from '../../plugins/auth.js';
@@ -8,7 +9,7 @@ import { listUsers, getUser, updateUser, setUserLocations, createInvite, listInv
 const admin = requireRole('admin');
 const ser = (u: { createdAt: Date; lockedUntil: Date | null }) => ({ createdAt: u.createdAt.toISOString(), lockedUntil: iso(u.lockedUntil) });
 
-export async function userRoutes(app: FastifyInstance) {
+export async function userRoutes(app: ApiFastifyInstance) {
   app.get('/', { preHandler: [app.authenticate, requireRole('admin', 'supervisor')], schema: { querystring: ListUsersQuery } }, async (req) => {
     const p = await listUsers(req.server.db, req.user!.orgId, req.query);
     return { items: p.items.map((u) => ({ ...u, ...ser(u) })), nextCursor: p.nextCursor };

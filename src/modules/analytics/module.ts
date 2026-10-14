@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /**
  * Analytics (PRD Phase 2/3 — pulled forward at the product owner's direction) and the
  * §41 success metrics that can be derived from backend data. All read-only, all
@@ -24,7 +25,7 @@ function window(q: { from?: string; to?: string }, defaultDays = 90) {
 
 const rowsOf = <T,>(r: unknown) => r as unknown as T[];
 
-export async function analyticsRoutes(app: FastifyInstance) {
+export async function analyticsRoutes(app: ApiFastifyInstance) {
   const pre = [app.authenticate, requireRole('admin', 'supervisor', 'viewer')];
 
   async function locFilter(req: { user?: { id: string; orgId: string; role: 'admin' | 'store_staff' | 'supervisor' | 'viewer' }; server: FastifyInstance }, locationId?: string, col = sql.raw('t.location_id')) {

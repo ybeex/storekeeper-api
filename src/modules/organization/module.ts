@@ -1,7 +1,8 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** Organization settings + approval policies (PRD §18, §23, §30, §32). Schema, service and routes in one file: it is small. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Db } from '../../db/index.js';
 import { orgSettings, approvalPolicies, organizations } from '../../db/schema.js';
 import { requireRole, anyRole } from '../../plugins/rbac.js';
@@ -22,7 +23,10 @@ const PatchSettings = Type.Object({
 const OPS = ['adjustment', 'loss', 'damage', 'retirement', 'manual_correction', 'checkout', 'checkin'] as const;
 const PutPolicies = Type.Object({
   policies: Type.Array(Type.Object({
-    operation: lit(OPS),
+    operation: Type.Union([
+      Type.Literal('adjustment'), Type.Literal('loss'), Type.Literal('damage'), Type.Literal('retirement'),
+      Type.Literal('manual_correction'), Type.Literal('checkout'), Type.Literal('checkin'),
+    ]),
     mode: Type.Union([Type.Literal('direct'), Type.Literal('request'), Type.Literal('approval')]),
     largeThreshold: Type.Optional(Type.Union([Type.Integer({ minimum: 1 }), Type.Null()])),
   }, { additionalProperties: false }), { minItems: 1, maxItems: OPS.length }),
@@ -35,16 +39,17 @@ async function getSettings(db: Db, orgId: string) {
   return { organization: o, ...s, updatedAt: s.updatedAt.toISOString() };
 }
 
-export async function organizationRoutes(app: FastifyInstance) {
+export async function organizationRoutes(app: ApiFastifyInstance) {
   app.get('/settings', { preHandler: [app.authenticate, anyRole] }, async (req) => getSettings(req.server.db, req.user!.orgId));
 
   app.patch('/settings', { preHandler: [app.authenticate, requireRole('admin')], schema: { body: PatchSettings } }, async (req) => {
     const actor = req.user! as Principal;
-    if (req.body.timezone) { try { new Intl.DateTimeFormat('en', { timeZone: req.body.timezone }); } catch { throw new ValidationError('timezone must be a valid IANA time zone, e.g. Africa/Lagos'); } }
+    const settings = req.body as { requireReconciliationReason?: boolean; photoRequiredFor?: (typeof TX_TYPES)[number][]; defaultExpectedReturnHours?: number | null; timezone?: string };
+    if (settings.timezone) { try { new Intl.DateTimeFormat('en', { timeZone: settings.timezone }); } catch { throw new ValidationError('timezone must be a valid IANA time zone, e.g. Africa/Lagos'); } }
     await req.server.db.transaction(async (tx) => {
       const [before] = await tx.select().from(orgSettings).where(eq(orgSettings.orgId, actor.orgId)).for('update').limit(1);
-      await tx.update(orgSettings).set({ ...req.body, updatedAt: new Date() }).where(eq(orgSettings.orgId, actor.orgId));
-      await audit(tx, { orgId: actor.orgId, actorUserId: actor.id, action: 'settings.updated', entityType: 'org_settings', entityId: actor.orgId, previous: before, next: req.body });
+      await tx.update(orgSettings).set({ ...settings, updatedAt: new Date() }).where(eq(orgSettings.orgId, actor.orgId));
+      await audit(tx, { orgId: actor.orgId, actorUserId: actor.id, action: 'settings.updated', entityType: 'org_settings', entityId: actor.orgId, previous: before, next: settings });
     });
     return getSettings(req.server.db, actor.orgId);
   });
@@ -64,7 +69,7 @@ export async function organizationRoutes(app: FastifyInstance) {
       }
       await audit(tx, { orgId: actor.orgId, actorUserId: actor.id, action: 'approval_policies.updated', entityType: 'approval_policies', entityId: actor.orgId, previous: before, next: req.body.policies });
     });
-    const rows = await req.server.db.select().from(approvalPolicies).where(and(eq(approvalPolicies.orgId, actor.orgId)));
+    const rows = await req.server.db.select().from(approvalPolicies).where(eq(approvalPolicies.orgId, actor.orgId));
     return { policies: rows.map((r) => ({ operation: r.operation, mode: r.mode, largeThreshold: r.largeThreshold })) };
   });
 }

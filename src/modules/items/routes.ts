@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import QRCode from 'qrcode';
@@ -8,7 +9,7 @@ import { bulkMoveItems, createItem, getItem, updateItem, archiveItem, restoreIte
 
 const ADMIN = requireRole('admin');
 
-export async function itemRoutes(app: FastifyInstance) {
+export async function itemRoutes(app: ApiFastifyInstance) {
   app.post('/', { preHandler: [app.authenticate, ADMIN], config: { idempotent: true }, schema: { body: CreateItemBody } }, async (req, reply) => {
     reply.code(201);
     return createItem(req.server.db, req.user!, req.body);

@@ -5,7 +5,10 @@ import { ColorField, IconField } from '../../lib/appearance.js';
 const NullInt = (min: number, max: number) => Type.Optional(Type.Union([Type.Integer({ minimum: min, maximum: max }), Type.Null()]));
 export const ItemType = Type.Union([Type.Literal('asset'), Type.Literal('consumable')]);
 export const Condition = Type.Union([Type.Literal('good'), Type.Literal('damaged'), Type.Literal('needs_inspection'), Type.Literal('replaced')]);
-export const AssetStatus = Type.Union(['available', 'checked_out', 'lost', 'damaged', 'under_repair', 'retired'].map((s) => Type.Literal(s)) as never);
+export const AssetStatus = Type.Union([
+  Type.Literal('available'), Type.Literal('checked_out'), Type.Literal('lost'),
+  Type.Literal('damaged'), Type.Literal('under_repair'), Type.Literal('retired'),
+]);
 
 export const CreateItemBody = Type.Object({
   type: ItemType,

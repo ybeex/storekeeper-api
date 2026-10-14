@@ -15,7 +15,8 @@
  *   7. swagger/docs         — introspects the routes registered after this point
  *   8. module routes          — the actual API, under /v1
  */
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify from 'fastify';
+import type { ApiFastifyInstance } from './types.js';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
@@ -59,13 +60,13 @@ import { httpDuration } from './lib/metrics.js';
 import { bumpOrgVersion } from './lib/cache.js';
 import { env } from './env.js';
 
-function parseTrustProxy(v: string): boolean | number | string {
+function parseTrustProxy(v: string): boolean | string {
   if (v === 'true') return true;
   if (v === 'false' || v === '') return false;
-  return /^\d+$/.test(v) ? Number(v) : v;
+  return v;
 }
 
-export async function buildApp(): Promise<FastifyInstance> {
+export async function buildApp(): Promise<ApiFastifyInstance> {
   const app = Fastify({
     logger: {
       level: env.LOG_LEVEL,

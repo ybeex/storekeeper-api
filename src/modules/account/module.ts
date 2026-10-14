@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /**
  * The organisations page (/app) for an admin who runs one or more organisations.
  *
@@ -23,7 +24,7 @@ async function myOrganizations(db: Db, userId: string) {
   return { currentOrgId: me?.orgId, rows };
 }
 
-export async function accountRoutes(app: FastifyInstance) {
+export async function accountRoutes(app: ApiFastifyInstance) {
   const ADMIN = requireRole('admin');
 
   app.get('/organizations', { preHandler: [app.authenticate, ADMIN] }, async (req) => {

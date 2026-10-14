@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** Jobs / projects / sites / tasks (PRD §10): optional context on a transaction, and a Holder. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -18,7 +19,7 @@ const ser = (j: typeof jobs.$inferSelect) => ({ id: j.id, code: j.code, name: j.
 const WRITE = requireRole('admin', 'supervisor');
 const dup = (err: unknown) => { if (isUniqueViolation(err, 'jobs_org_code_unique')) throw new ConflictError('JOB_CODE_TAKEN', 'This job code is already in use'); throw err; };
 
-export async function jobRoutes(app: FastifyInstance) {
+export async function jobRoutes(app: ApiFastifyInstance) {
   app.post('/', { config: { idempotent: true }, preHandler: [app.authenticate, WRITE], schema: { body: Create } }, async (req, reply) => {
     const a = req.user!;
     try {

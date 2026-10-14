@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** People — the Holders who are individuals (PRD §8). Most never log in; `userId` links an optional account. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -27,7 +28,7 @@ const ser = (p: typeof people.$inferSelect) => ({
 
 const WRITERS = ['admin', 'supervisor', 'store_staff'] as const; // the storekeeper adds a worker at the counter
 
-export async function peopleRoutes(app: FastifyInstance) {
+export async function peopleRoutes(app: ApiFastifyInstance) {
   app.post('/', { config: { idempotent: true }, preHandler: [app.authenticate, requireRole(...WRITERS)], schema: { body: Create } }, async (req, reply) => {
     const a = req.user!;
     try {

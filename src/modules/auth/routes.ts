@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { authRouteRateLimit } from '../../plugins/security.js';
@@ -25,11 +26,11 @@ function bearer(req: { headers: Record<string, unknown> }): string | undefined {
   return typeof h === 'string' ? h.replace(/^Bearer\s+/i, '') : undefined;
 }
 
-export async function authRoutes(app: FastifyInstance) {
+export async function authRoutes(app: ApiFastifyInstance) {
   const evict = async (hashes: string[]) => {
     if (hashes.length === 0) return;
     // Best effort: the cache TTL bounds staleness even if Redis is unreachable right now.
-    await app.redis.del(...hashes.map(sessionCacheKey)).catch((err) => app.log.warn({ err }, 'session cache evict failed'));
+    await app.redis.del(...hashes.map(sessionCacheKey)).catch((err: unknown) => app.log.warn({ err }, 'session cache evict failed'));
   };
   const info = (req: { ip: string; headers: Record<string, unknown> }) => ({ ip: req.ip, userAgent: String(req.headers['user-agent'] ?? '') });
 

@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /**
  * Activity feed + holder search — the two read APIs the UI kit's home screen leans on.
  *  - GET /activity : "Ben checked out Angle grinder 12 to Electrical team · 09:12" (ledger, enriched, human-ready)
@@ -20,7 +21,7 @@ const Q = Type.Object({
   jobId: Type.Optional(Uuid), from: Type.Optional(Type.String({ format: 'date-time' })), to: Type.Optional(Type.String({ format: 'date-time' })),
 });
 
-export async function activityRoutes(app: FastifyInstance) {
+export async function activityRoutes(app: ApiFastifyInstance) {
   app.get('/activity', { preHandler: [app.authenticate, anyRole], schema: { querystring: Q } }, async (req) => {
     const a = req.user!; const q = req.query; const limit = q.limit ?? 30;
     const actorFilter = ownActivityOnly(a) ?? q.actorUserId; // store staff are pinned to their own actions

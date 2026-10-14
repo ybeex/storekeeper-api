@@ -9,7 +9,7 @@ const SPEC = {
   NODE_ENV: { type: 'string', default: 'development', oneOf: ['development', 'test', 'production'] },
   PORT: { type: 'number', default: 3000 },
   HOST: { type: 'string', default: '0.0.0.0' },
-  // Which proxies may set X-Forwarded-For (rate limits and audit IPs depend on it). 'false' | 'true' | hop count | comma-separated CIDRs.
+  // Which proxies may set X-Forwarded-For (rate limits and audit IPs depend on it). 'false' | 'true' | comma-separated CIDRs.
   // Behind the Next.js server / load balancer, set the proxy's address. 'true' trusts ANY sender and lets a caller spoof their IP.
   TRUST_PROXY: { type: 'string', default: 'false' },
   LOG_LEVEL: { type: 'string', default: 'info' },
@@ -106,10 +106,11 @@ function loadEnv(): Env {
     }
   }
   const env = out as unknown as Env;
+  if (/^\d+$/.test(env.TRUST_PROXY)) problems.push('  TRUST_PROXY: numeric hop counts are unsupported; specify the trusted proxy IP or CIDR');
   if (problems.length === 0 && env.NODE_ENV === 'production') {
     // Fail closed in production on settings whose insecure defaults are only acceptable in dev.
     if (!env.CORS_ORIGINS) problems.push('  CORS_ORIGINS: must be set in production');
-    if (env.TRUST_PROXY === 'true') problems.push('  TRUST_PROXY: "true" trusts any client-supplied X-Forwarded-For; use a hop count or the proxy CIDR');
+    if (env.TRUST_PROXY === 'true') problems.push('  TRUST_PROXY: "true" trusts any client-supplied X-Forwarded-For; use the proxy IP or CIDR');
     if (env.MAIL_ENABLED && (!env.MAIL_USER || !env.MAIL_PASS)) problems.push('  MAIL_USER/MAIL_PASS: required when MAIL_ENABLED');
     if (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) problems.push('  S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY: required in production');
     if (env.JOBS_MODE === 'inline') problems.push('  JOBS_MODE: "inline" is not allowed in production');

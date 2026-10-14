@@ -1,3 +1,4 @@
+import type { ApiFastifyInstance } from '../../types.js';
 /** Shelves: the top of the browse hierarchy (shelf → category → item). Created separately from categories. */
 import type { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
@@ -27,7 +28,7 @@ const dup = (e: unknown): never => {
   throw e;
 };
 
-export async function shelfRoutes(app: FastifyInstance) {
+export async function shelfRoutes(app: ApiFastifyInstance) {
   const ADMIN = requireRole('admin');
 
   app.post('/', { config: { idempotent: true }, preHandler: [app.authenticate, ADMIN], schema: { body: Create } }, async (req, reply) => {
