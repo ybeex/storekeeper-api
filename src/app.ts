@@ -31,6 +31,7 @@ import idempotencyPlugin from './plugins/idempotency.js';
 
 import { authRoutes } from './modules/auth/routes.js';
 import { userRoutes } from './modules/users/routes.js';
+import { accountRoutes } from './modules/account/module.js';
 import { organizationRoutes } from './modules/organization/module.js';
 import { locationRoutes } from './modules/locations/module.js';
 import { peopleRoutes } from './modules/people/module.js';
@@ -129,6 +130,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(async (v1) => {
     await v1.register(authRoutes, { prefix: '/auth' });
     await v1.register(userRoutes, { prefix: '/users' });
+    await v1.register(accountRoutes, { prefix: '/account' });
     await v1.register(organizationRoutes, { prefix: '/organization' });
     await v1.register(locationRoutes, { prefix: '/locations' });
     await v1.register(peopleRoutes, { prefix: '/people' });
