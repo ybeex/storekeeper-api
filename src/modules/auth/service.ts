@@ -237,10 +237,13 @@ export async function createOrganizationForAdmin(db: Db, actorUserId: string, in
           await tx.update(users).set({ accountId }).where(eq(users.id, me.id));
         }
         const [org] = await tx.insert(organizations).values({ name: input.organizationName.trim(), slug }).returning();
+        if (!org) throw new Error('Organization insert returned no row');
         await tx.insert(orgSettings).values({ orgId: org.id });
         await tx.insert(approvalPolicies).values(DEFAULT_POLICIES.map((p) => ({ orgId: org.id, ...p })));
         const [loc] = await tx.insert(locations).values({ orgId: org.id, name: input.firstLocationName?.trim() || 'Main Store', kind: 'store' }).returning();
+        if (!loc) throw new Error('Location insert returned no row');
         const [user] = await tx.insert(users).values({ orgId: org.id, email: me.email, fullName: me.fullName, passwordHash: me.passwordHash, role: 'admin', accountId }).returning();
+        if (!user) throw new Error('Admin insert returned no row');
         await tx.insert(people).values({ orgId: org.id, fullName: me.fullName?.trim() || me.email.split('@')[0], email: me.email, userId: user.id });
         await audit(tx, { orgId: org.id, actorUserId: user.id, action: 'organization.created_by_admin', entityType: 'organization', entityId: org.id, next: { fromOrgId: me.orgId } });
         return { org, user, location: loc };

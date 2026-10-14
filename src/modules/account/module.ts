@@ -32,7 +32,8 @@ export async function accountRoutes(app: FastifyInstance) {
   });
 
   app.post('/organizations', { preHandler: [app.authenticate, ADMIN], schema: { body: Type.Object({ organizationName: Type.String({ minLength: 2, maxLength: 120 }), firstLocationName: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })) }, { additionalProperties: false }) } }, async (req, reply) => {
-    const r = await createOrganizationForAdmin(req.server.db, req.user!.id, req.body);
+    const input = req.body as { organizationName: string; firstLocationName?: string };
+    const r = await createOrganizationForAdmin(req.server.db, req.user!.id, input);
     reply.code(201);
     return { id: r.org.id, name: r.org.name, slug: r.org.slug };
   });
