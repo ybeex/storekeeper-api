@@ -7,7 +7,7 @@
     "node": ">=20.11"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --env-file=.env src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "node --import tsx --import ./test/env-setup.ts --test --test-concurrency=1 test/*.test.ts",
@@ -16,7 +16,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "start:worker": "node dist/worker.js",
-    "dev:worker": "tsx watch src/worker.ts",
+    "dev:worker": "tsx watch --env-file=.env src/worker.ts",
     "test:unit": "node --import tsx --import ./test/env-setup.ts --test test/unit/*.test.ts",
     "db:setup": "psql \"$DATABASE_URL\" -f drizzle/manual/0000_enable_extensions.sql && drizzle-kit migrate && psql \"$DATABASE_URL\" -f drizzle/manual/0001_role_settings.sql && psql \"$DATABASE_URL\" -f drizzle/manual/0002_ledger_immutability.sql && psql \"$DATABASE_URL\" -f drizzle/manual/0003_catalog_appearance_and_imports.sql",
     "seed": "node --import tsx scripts/seed.ts"
